@@ -1,0 +1,173 @@
+#!/usr/bin/env python3
+import sys
+from argparse import ArgumentParser
+from pathlib import Path
+from enum import Enum, auto
+
+
+class TokenType(Enum):
+    # Single character tokens
+    LEFT_PAREN = auto()
+    RIGHT_PAREN = auto()
+    LEFT_BRACE = auto()
+    RIGHT_BRACE = auto()
+    COMMA = auto()
+    DOT = auto()
+    MINUS = auto()
+    PLUS = auto()
+    SEMICOLON = auto()
+    SLASH = auto()
+    STAR = auto()
+
+    # One or two character tokens
+    BANG = auto()
+    BANG_EQUAL = auto()
+    EQUAL = auto()
+    EQUAL_EQUAL = auto()
+    GREATER = auto()
+    GREATER_EQUAL = auto()
+    LESS = auto()
+    LESS_EQUAL = auto()
+
+    # Literals
+    IDENTIFIER = auto()
+    STRING = auto()
+    NUMBER = auto()
+
+    # Keywords
+    AND = auto()
+    CLASS = auto()
+    ELSE = auto()
+    FALSE = auto()
+    FUN = auto()
+    FOR = auto()
+    IF = auto()
+    NIL = auto()
+    OR = auto()
+    PRINT = auto()
+    RETURN = auto()
+    SUPER = auto()
+    THIS = auto()
+    TRUE = auto()
+    VAR = auto()
+    WHILE = auto()
+
+    EOF = auto()
+
+
+class Scanner:
+    def __init__(self, source, errorfunction):
+        self.source = source
+        self.start = 0
+        self.current = 0
+        self.line = 1
+        self.errorfunction = errorfunction
+        self.tokens = []
+
+    def scan_tokens(self):
+        while not self.is_at_end():
+            self.start = self.current
+            self.scan_token()
+
+        self.tokens.append(Token(TokenType.EOF, "", None, self.line))
+        return self.tokens
+
+    def is_at_end(self):
+        return self.current >= len(self.source)
+
+    def scan_token(self):
+        c = self.advance()
+        match c:
+            case "(":
+                self.add_token(TokenType.LEFT_PAREN, None)
+            case ")":
+                self.add_token(TokenType.RIGHT_PAREN, None)
+            case "{":
+                self.add_token(TokenType.LEFT_BRACE, None)
+            case "}":
+                self.add_token(TokenType.RIGHT_BRACE, None)
+            case ",":
+                self.add_token(TokenType.COMMA, None)
+            case ".":
+                self.add_token(TokenType.DOT, None)
+            case "-":
+                self.add_token(TokenType.MINUS, None)
+            case "+":
+                self.add_token(TokenType.PLUS, None)
+            case ";":
+                self.add_token(TokenType.SEMICOLON, None)
+            case "*":
+                self.add_token(TokenType.STAR, None)
+            case _:
+                self.errorfunction(self.line, f"Unexpected character: {c}")
+
+    def advance(self):
+        c = self.source[self.current]
+        self.current = self.current + 1
+        return c
+
+    def add_token(self, _type: TokenType, literal):
+        text = self.source[self.start:self.current]
+        self.tokens.append(Token(_type, text, literal, self.line))
+
+
+class Token:
+    def __init__(self, _type: TokenType, lexeme: str, literal, line: int):
+        self._type = _type
+        self.lexeme = lexeme
+        self.literal = literal
+        self.line = line
+
+    def to_string(self):
+        return f"{self._type} {self.lexeme} {self.literal}"
+
+
+class Lox:
+    def run_file(self, path: Path) -> None:
+        with open(path, "rb") as f:
+            bytes = f.read()
+        self.run(bytes)
+        if self.had_error:
+            exit(65)
+
+    def run_prompt(self):
+        print("> ", end="", flush=True)
+        for line in sys.stdin:
+            self.run(line)
+            self.had_error = False
+
+    def run(self, source: str):
+        scanner = Scanner(source, self.error)
+        tokens = scanner.scan_tokens()
+
+        for token in tokens:
+            print(token.to_string(), flush=True)
+
+    def error(self, line: int, message: str):
+        self.report(line, "", message)
+
+    def report(self, line: int, where: str, message: str):
+        print(f"[line {line}] Error{where}: {message}", file=sys.stderr, flush=True)
+        self.had_error = True
+
+
+def main():
+    parser = ArgumentParser(
+        description="jlox is an interpreter for the Lox language",
+    )
+    parser.add_argument(
+        "script",
+        nargs="?",
+        type=Path,
+        help="Path to Lox script",
+    )
+    args = parser.parse_args()
+
+    session = Lox()
+    if args.script:
+        session.run_file(args.script)
+    else:
+        session.run_prompt()
+
+
+main()
