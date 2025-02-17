@@ -98,15 +98,89 @@ class Scanner:
                 self.add_token(TokenType.SEMICOLON, None)
             case "*":
                 self.add_token(TokenType.STAR, None)
+            case "!":
+                self.add_token(TokenType.BANG_EQUAL if self.match("=") else TokenType.BANG)
+            case "=":
+                self.add_token(TokenType.EQUAL_EQUAL if self.match("=") else TokenType.EQUAL)
+            case "<":
+                self.add_token(TokenType.LESS_EQUAL if self.match("=") else TokenType.LESS)
+            case ">":
+                self.add_token(TokenType.GREATER_EQUAL if self.match("=") else TokenType.GREATER)
+            case "/":
+                if self.match("/"):
+                    # A comment until end of line
+                    while self.peek() != "\n" and not self.is_at_end():
+                        self.advance()
+                else:
+                    self.add_token(TokenType.SLASH)
+            case " ":
+                pass
+            case "\r":
+                pass
+            case "\t":
+                pass
+            case "\n":
+                self.line = self.line + 1
+            case '"':
+                self.string()
             case _:
-                self.errorfunction(self.line, f"Unexpected character: {c}")
+                if c.isdigit():
+                    self.number()
+                else:
+                    self.errorfunction(self.line, f"Unexpected character: {c}")
+
+    def number(self):
+        while self.peek().isdigit():
+            self.advance()
+
+        if self.peek() == "." and self.peek_next().isdigit():
+            self.advance()
+
+            while self.peek().isdigit():
+                self.advance()
+        
+        self.add_token(TokenType.NUMBER, float(self.source[self.start:self.current]))
+
+    def string(self):
+        while self.peek() != '"' and not self.is_at_end():
+            if self.peek() == '\n':
+                self.line = self.line + 1
+            self.advance()
+
+        if self.is_at_end():
+            self.errorfunction(self.line, f"Unterminated string")
+            return
+
+        self.advance()
+        
+        value = self.source[self.start + 1:self.current - 1]
+        self.add_token(TokenType.STRING, value)
+
+    def peek_next(self):
+        if self.current + 1 >= len(self.source):
+            return '\0'
+        return self.source[self.current+1]
+
+    def peek(self):
+        if self.is_at_end():
+            return '\0'
+        return self.source[self.current]
+
+    def match(self, expected: str):
+        if self.is_at_end():
+            return False
+        if self.source[self.current] != expected:
+            return False
+
+        self.current = self.current + 1
+        return True
 
     def advance(self):
         c = self.source[self.current]
         self.current = self.current + 1
         return c
 
-    def add_token(self, _type: TokenType, literal):
+    def add_token(self, _type: TokenType, literal=None):
         text = self.source[self.start:self.current]
         self.tokens.append(Token(_type, text, literal, self.line))
 
@@ -135,6 +209,8 @@ class Lox:
         for line in sys.stdin:
             self.run(line)
             self.had_error = False
+            print("> ", end="", flush=True)
+        print("\n")
 
     def run(self, source: str):
         scanner = Scanner(source, self.error)
